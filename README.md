@@ -20,9 +20,7 @@ nano /hack/bat/config.js
 ```
 Default gap for execution effect to take place is 500 milliseconds, this allow my computer to do autosaving without breaking the flow.
 
-If the script's log become silence after start, maybe the calculating process takes too long. This normally happens when you bought too many rams on your owned servers. You can visualize the calculating process by changing the code in `/hack/bat/masterV3.js` file, line 110 `logStr=>{},` to `log,` (becareful, by default the logs will also printed into the file `/masterV2RunInfo.txt`, it may take a while to grow into about 80 mega bytes, don't open it in-game, it will blackscreen your game). 
-
-I have all 25 owned servers upgraded to maximun ram, and the whole process didn't last more than 10 mins.
+If the script's log become silence after start, maybe the calculating process takes too long. This normally happens when you bought too many rams on your owned servers. You can visualize the calculating process by changing the code in `/hack/bat/masterV3.js` file, line 110 `logStr=>{},` to `log,` (becareful, by default the logs will also printed into the file `/masterV2RunInfo.txt`, it may take a while to grow into about 80 mega bytes, don't open it in-game, it will blackscreen your game). I have all 25 owned servers upgraded to maximun ram, and the whole calculation didn't take more than 10 mins.
 
 ## Structure
 I use different scripts for different tasks, and tried to categorize them using folders (although they are lies):
