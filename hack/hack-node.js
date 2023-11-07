@@ -47,7 +47,8 @@ export async function main(ns) {
 				totalProd += ns.hacknet.getNodeStats(j).production;
 			}
 			if (totalProd!=0 && cost / totalProd > 60) {
-				ns.print("最便宜的升级需要超过1分钟赚取，脚本已停止");
+				//ns.print("最便宜的升级需要超过1分钟赚取，脚本已停止");
+				ns.print("The cheapest upgrade costs more than one minute to earn, the script has stopped");
 				ns.exit();
 			}
 
