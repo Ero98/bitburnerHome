@@ -41,6 +41,9 @@ export async function chooseTargets(ns, log, dests, availableAllocs, stepMillis,
 
 	let remainAllocs = availableAllocs.slice();
 
+	const totalAllocNumber = remainAllocs.reduce((a,b)=>a+b);
+	let nextAllocPercent = 0;
+
 	const targetParams = [];
 	const targetHpb = [];
 	const targetLastThread = [];
@@ -64,6 +67,7 @@ export async function chooseTargets(ns, log, dests, availableAllocs, stepMillis,
 
 		//find next best investment
 		for (let i in dests) {
+			await ns.sleep(1);
 			const dest = dests[i];
 			
 			log(` begin to cal ${i}:${dest}, lastHpb ${targetHpb[i]}`);
@@ -93,7 +97,14 @@ export async function chooseTargets(ns, log, dests, availableAllocs, stepMillis,
 				continue;
 			}
 			
-			const calRes = calDps(ns, logStr=>log('   '+logStr), dest, targetHpb[i]+1, returnedRemainAllocs, stepMillis, hwgw);
+			/** 
+		 	 *	@type {{dps:number, tpb:number
+			 *	hackServerAlloc:number[][], growServerAlloc:number[][], weaken1ServerAlloc:number[][], weaken2ServerAlloc:number[][], 
+			 *	concurrency:number, secondPerBatch:number, batchGap:number, 
+			 *	hackPerBatch:number, growPerBatch:number
+			 *	weaken1Time:number, weaken2Time:number, hackTime:number, growTime:number}}
+			 */
+			const calRes = await calDps(ns, logStr=>log('   '+logStr), dest, targetHpb[i]+1, returnedRemainAllocs, stepMillis, hwgw);
 			log(` dps:${calRes.dps} dpb:${calRes.hackPerBatch}`);
 			// //Stop when required threads exceeds availables
 			// if (calRes.concurrency === 0) {
@@ -152,6 +163,13 @@ export async function chooseTargets(ns, log, dests, availableAllocs, stepMillis,
 		targetLastThread[maxIncDpsPTIndex] = maxIncDpsPTServerParam.tpb * maxIncDpsPTServerParam.concurrency;
 		targetLastDps[maxIncDpsPTIndex] = maxIncDpsPTServerParam.dps;
 		log(`investing i:${i}:${dests[i]} hpb:${targetHpb[i]} thd:${targetLastThread[i]} dps:${targetLastDps[i]}`);
+		
+		const remainAllocNumber = remainAllocs.reduce((a,b)=>a+b);
+		const allocPercent = (1 - remainAllocNumber / totalAllocNumber) * 100;
+		if ((1 - remainAllocNumber / totalAllocNumber) * 100 > nextAllocPercent) {
+			log('INFO', `${new Date().toString()} percent ${allocPercent}% total ${totalAllocNumber} left ${remainAllocNumber} `);
+			nextAllocPercent += 10;
+		}
 	}
 
 	return targetParams;
@@ -176,7 +194,7 @@ export async function chooseTargets(ns, log, dests, availableAllocs, stepMillis,
  * @param {number} stepMillis step time in millis, used for adding gap between effects to avoid failures.
  * @param {bool} hwgw hack weaken grow weaken mode, if false, will use one weaken operation to counter the effects().
  */
-function calDps(ns, log, dest, hpb, availableAllocs, stepMillis, hwgw=true) {
+async function calDps(ns, log, dest, hpb, availableAllocs, stepMillis, hwgw=true) {
 	const serverOptimal = getServerOptimal(ns, dest);
 
 	const weaken2Time = formu.getWeakenTime(ns, serverOptimal, ns.getPlayer());
@@ -226,6 +244,7 @@ function calDps(ns, log, dest, hpb, availableAllocs, stepMillis, hwgw=true) {
 	//先分配hack、再分配grow，每次要求完整分配
 	//weaken可以碎片分配
 	while (batch < maxBatch) {
+		await ns.sleep(1);
 		const hackAllocRes = allocator.alloc(Math.ceil(hackThreadsRaw), false);
 		if (!hackAllocRes.success) {
 			break;

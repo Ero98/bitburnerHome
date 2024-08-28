@@ -12,7 +12,7 @@ const preparationsLogFile = config.preparationsLogFileGet();
 const scriptBaseCost = config.scriptBaseCostGet();
 
 /** @type {string[]} */
-const servers = [];
+const servers = []; 
 const scanQueue = [local];
 
 const arrAdd = (arrA, arrB) => arrA.map((aEle, aInd) => aEle + arrB[aInd]);
@@ -51,19 +51,23 @@ export async function main(ns) {
 		if(servers.indexOf(host) === -1) {
 			servers.push(host);
 			scanQueue.push(...ns.scan(host));
-			// log(ns.scan(host));
+			// log(`[log] scan ${host} result: ${ns.scan(host)}`);
 		}
 	}
+
+	// log(`[log] Scaned Servers: ${servers}`);
 
 	//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ TODO ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 将执行脚本换成函数调用 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	//复制脚本到所有服务器（删除并更新脚本）
-	servers.forEach((host)=>{
-		ns.run("/tools/autonuke.js", 1, host);
+	for (let host of servers) {
+		while (ns.run("/tools/autonuke.js", 1, host) == 0) {
+			await ns.sleep(1);
+		}
 		if (ns.hasRootAccess(host)) {
 			ns.run("/tools/scp.js", 1, "-r", "/tools", "/lib", "/hack", host);
 		}
-	})
+	}
 
 	//整理可用资源
 	const availableServers = servers.filter((dest)=>{
@@ -71,6 +75,8 @@ export async function main(ns) {
 		let enoughRam = ns.getServerMaxRam(dest) >= scriptBaseCost;
 		return rooted && enoughRam;
 	});
+// log(`[log] Available Servers: ${availableServers}`);
+
 	const availableRams = availableServers.map((server)=>(ns.getServerMaxRam(server) - ns.getServerUsedRam(server)));
 	const availableAllocs = availableRams.map((ram)=>Math.floor(ram/scriptBaseCost));
 	const availableTotalThreads = availableAllocs.reduce((prev, cur)=>prev+cur);
@@ -79,25 +85,26 @@ export async function main(ns) {
 	log(`avai alloc:${availableAllocs}`);
 
 	//筛选可攻击的服务器
-	const targetCandidates = availableServers.filter((dest)=>{
+	const targetCandidates = servers.filter((dest)=>{
 		let isPurchasedServer = ns.getPurchasedServers().indexOf(dest) !== -1;
 		let isHomeServer = dest===local;
 		let isNoMoney = ns.getServerMaxMoney(dest)===0;
-		return ! isPurchasedServer && ! isHomeServer && ! isNoMoney;
+		let rooted = ns.hasRootAccess(dest);
+		return ! isPurchasedServer && ! isHomeServer && ! isNoMoney && rooted;
 	});
 	log(`targets: ${targetCandidates}`);
 
 	log("\n["+ new Date().toISOString() +"] 运行开始","w");
 
-	//如果没有Formula程序，在计算前需要先grow to max
-	if (!ns.fileExists("/Formulas.exe")) {
-		const needGrowCandidates = targetCandidates.filter(target=>{
-			const isMoneyMax = ns.getServerMoneyAvailable(target) === ns.getServerMaxMoney(target);
-			const isSecMin = ns.getServerSecurityLevel(target) === ns.getServerMinSecurityLevel(target);
-			return !isMoneyMax || !isSecMin;
-		})
-		await autoGrow(ns, logStr=>{}, needGrowCandidates, availableServers);
-	}
+	// //如果没有Formula程序，在计算前需要先grow to max
+	// if (!ns.fileExists("/Formulas.exe")) {
+	// 	const needGrowCandidates = targetCandidates.filter(target=>{
+	// 		const isMoneyMax = ns.getServerMoneyAvailable(target) === ns.getServerMaxMoney(target);
+	// 		const isSecMin = ns.getServerSecurityLevel(target) === ns.getServerMinSecurityLevel(target);
+	// 		return !isMoneyMax || !isSecMin;
+	// 	})
+	// 	await autoGrow(ns, logStr=>{}, needGrowCandidates, availableServers);
+	// }
 
 	/** 
 	 * @type {{dps:number, tpb:number
@@ -107,7 +114,11 @@ export async function main(ns) {
 	 *	weaken1Time:number, weaken2Time:number, hackTime:number, growTime:number}[]}
 	 */
 	const resArr = await chooseTargets(ns, 
-			logStr=>{}, 
+			(logStr, ...args)=>{
+				if (logStr === 'INFO') {
+					log(args[0]);
+				} 
+			}, 
 			targetCandidates,
 			availableAllocs,
 			stepTimeMillis,
@@ -132,12 +143,17 @@ export async function main(ns) {
 					.reduce((a,b)=>a+b)).reduce((a,b)=>a+b)
 	} total dps: ${resArr.filter((res)=>res!==null).map(res=>res.dps).reduce((a,b)=>a+b).toLocaleString()}`);
 	
+	let autoGrowFinishCheckers = [];
 	for (let i in resArr) {
 		if (resArr[i]===null) {
 			continue;
 		}
 		//auto-grow
-		await autoGrow(ns, log, targetCandidates, availableServers);
+		let finishedChecker = await autoGrow(ns, log, 
+			targetCandidates[i],
+			resArr[i],
+			availableServers);
+		autoGrowFinishCheckers.push(finishedChecker);
 	}
 
 	let handleTargetFuncArr = [];
@@ -151,9 +167,19 @@ export async function main(ns) {
 			availableServers));
 	}
 
+	let autoGrowFinishedStates = autoGrowFinishCheckers.map((x)=>false);
 	//启动任务
 	while (true) {
 		await ns.sleep(1);
-		handleTargetFuncArr.forEach(func=>func());
+		handleTargetFuncArr.forEach((func, i)=> {
+			if (!autoGrowFinishedStates[i]) {
+				let autoGrowFinished = autoGrowFinishCheckers[i]();
+				if (autoGrowFinished) {
+					autoGrowFinishedStates[i] = true;
+				}
+			} else {
+				func()
+			}
+		});
 	}
 }
