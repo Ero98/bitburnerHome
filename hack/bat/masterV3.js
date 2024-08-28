@@ -1,6 +1,6 @@
 import {chooseTargets} from "/hack/bat/select-server.js";
 import {getTargetHandler} from "/hack/bat/schedule.js";
-import {autoGrow} from "/hack/bat/auto-grow.js";
+import {autoGrow, autoGrowSimple} from "/hack/bat/auto-grow.js";
 
 import * as config from "/hack/bat/config.js";
 
@@ -77,10 +77,13 @@ export async function main(ns) {
 	});
 // log(`[log] Available Servers: ${availableServers}`);
 
+	await ns.sleep(100)
+
 	const availableRams = availableServers.map((server)=>(ns.getServerMaxRam(server) - ns.getServerUsedRam(server)));
 	const availableAllocs = availableRams.map((ram)=>Math.floor(ram/scriptBaseCost));
 	const availableTotalThreads = availableAllocs.reduce((prev, cur)=>prev+cur);
-
+	
+	log(`avai used:${availableServers.map(server=>server+":"+ns.getServerUsedRam(server))}`)
 	log(`avai rams:${availableRams}`);
 	log(`avai alloc:${availableAllocs}`);
 
@@ -96,15 +99,15 @@ export async function main(ns) {
 
 	log("\n["+ new Date().toISOString() +"] 运行开始","w");
 
-	// //如果没有Formula程序，在计算前需要先grow to max
-	// if (!ns.fileExists("/Formulas.exe")) {
-	// 	const needGrowCandidates = targetCandidates.filter(target=>{
-	// 		const isMoneyMax = ns.getServerMoneyAvailable(target) === ns.getServerMaxMoney(target);
-	// 		const isSecMin = ns.getServerSecurityLevel(target) === ns.getServerMinSecurityLevel(target);
-	// 		return !isMoneyMax || !isSecMin;
-	// 	})
-	// 	await autoGrow(ns, logStr=>{}, needGrowCandidates, availableServers);
-	// }
+	//如果没有Formula程序，在计算前需要先grow to max
+	if (!ns.fileExists("/Formulas.exe")) {
+		const needGrowCandidates = targetCandidates.filter(target=>{
+			const isMoneyMax = ns.getServerMoneyAvailable(target) === ns.getServerMaxMoney(target);
+			const isSecMin = ns.getServerSecurityLevel(target) === ns.getServerMinSecurityLevel(target);
+			return !isMoneyMax || !isSecMin;
+		})
+		await autoGrowSimple(ns, logStr=>{}, needGrowCandidates, availableServers);
+	}
 
 	/** 
 	 * @type {{dps:number, tpb:number

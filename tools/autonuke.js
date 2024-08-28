@@ -10,6 +10,7 @@ export async function main(ns) {
 	const means = [ns.brutessh, ns.ftpcrack, ns.relaysmtp, ns.httpworm, ns.sqlinject];
 	const files = ["/BruteSSH.exe", "/FTPCrack.exe", "/relaySMTP.exe", "/HTTPWorm.exe", "/SQLInject.exe"];
 
+	// ns.tprint(`nuking ${host}, ports: ${ports}`)
 	for (let i=0; i<ports; ++i) {
 		if (!ns.fileExists(files[i])) {
 			ns.tprint("Required file not exist: ", files[i]);
