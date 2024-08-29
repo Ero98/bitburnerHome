@@ -2,6 +2,7 @@
 A code base for a batch hacking implementation that achieved hundreds of billions per second.
 
 ## Update Note(24/08/30)
+### Structural changes
 This project has introduced:
 - Bitburner's official file-sync method to support external editing.
 - Typescript support.
@@ -10,6 +11,11 @@ Referenced: https://github.com/bitburner-official/typescript-template
 Original files has moved to `/src` folder, source files are now either `.js` or `.ts`.
 
 To utilize file-syncing and `.ts` file compiling, [Node.js](https://nodejs.org/en/download/package-manager) is needed. Check out `bitburner-official/typescript-template`'s [step-by-step guide](https://github.com/bitburner-official/typescript-template/blob/main/BeginnersGuide.md) for installation details.
+
+### Algorithm changes
+The original hwgw algorithm in `/hack/bat` has a way-too-simple grow-to-max algorithm, optimizations has made:
+1. Grow-to-max process before calculations now allocate compute power according to grow difficaulty and grow progress(still more works could be done here).
+2. Each target will now be hacked right after its grown-to-max(you need to comment out the grow-to-max process mentioned in the previous point to see the difference), rather than waiting for all targets growing to max.
 
 ## Quick Start
 0. Install the latest version of `Node.js`.
