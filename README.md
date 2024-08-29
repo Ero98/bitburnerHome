@@ -14,8 +14,8 @@ To utilize file-syncing and `.ts` file compiling, [Node.js](https://nodejs.org/e
 
 ### Algorithm changes
 The original hwgw algorithm in `/hack/bat` has a way-too-simple grow-to-max algorithm, optimizations has made:
-1. Grow-to-max process before calculations now allocate compute power according to grow difficaulty and grow progress(still more works could be done here).
-2. Each target will now be hacked right after its grown-to-max(you need to comment out the grow-to-max process mentioned in the previous point to see the difference), rather than waiting for all targets growing to max.
+1. Grow-to-max process before calculations now allocate compute power according to grow difficaulty and grow progress(still more work can be done here).
+2. Each target will now be hacked right after it reached maximun money and minumun security(you will need to comment out the grow-to-max process mentioned in the previous point to see the difference), rather than waiting for all targets growing to max.
 
 ## Quick Start
 0. Install the latest version of `Node.js`.
