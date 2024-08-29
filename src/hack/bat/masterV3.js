@@ -120,7 +120,13 @@ export async function main(ns) {
 			(logStr, ...args)=>{
 				if (logStr === 'INFO') {
 					log(args[0]);
-				} 
+				}
+
+				// if (args.length > 0) {
+				// 	log(logStr + " " + args);
+				// } else {
+				// 	log(logStr);
+				// }
 			}, 
 			targetCandidates,
 			availableAllocs,
