@@ -1,11 +1,13 @@
 import {execMulti} from "/hack/bat/exec-multi.js";
 import * as config from "/hack/bat/config.js";
 import {scriptBaseCostGet} from "/hack/bat/config.js";
+import * as formu from "/hack/bat/formulas.js";
 
 const autoGrowScript = config.autoGrowScriptGet();
 
 const arrAdd = (arrA, arrB) => arrA.map((aEle, aInd) => aEle + arrB[aInd]);
 const arrMinus = (arrA, arrB) => arrA.map((aEle, aInd) => aEle - arrB[aInd]);
+const arrCal = (arrA, arrB, cal) => arrA.map((aEle, aInd) => cal(aEle, arrB[aInd]));
 
 /** 
  * @param {NS} ns 
@@ -75,6 +77,36 @@ export async function autoGrowSimple(ns, log, targets, availableServers) {
 	log(`execute targets:${targets}`);
 	const scriptCostGB = ns.getScriptRam(autoGrowScript);
 	const serverRams = availableServers.map(serverName=>ns.getServerMaxRam(serverName) - ns.getServerUsedRam(serverName));
+	
+	const targetGrowTimes = targets.map(serverName=>formu.getGrowTime(ns, ns.getServer(serverName), ns.getPlayer()));
+	const targetGrowGains = targets.map(serverName=>ns.getServerGrowth(serverName));
+	const targetGrowProgressPercent = targets.map(serverName=>(ns.getServerMaxMoney(serverName) - ns.getServerMoneyAvailable(serverName))/ns.getServerMaxMoney(serverName));
+	
+	// A simple scoring method accounting for grow difficaulty, grow time(hack skill required), and current grow progress.
+	const targetGrowGainsPerUnitTime = arrCal(targetGrowGains, targetGrowTimes, (gain, time)=>gain/time);
+	const targetGrowCosts = arrCal(targetGrowGainsPerUnitTime, targetGrowProgressPercent, 
+		(gput, progress) => (1-progress) * gput);
+
+	const targetGrowCostDescOrderedIndices = new Array(targets.length);
+	for (let i in targets) targetGrowCostDescOrderedIndices[i] = i;
+	targetGrowCostDescOrderedIndices.sort((a,b)=> targetGrowCosts[b] - targetGrowCosts[a]);
+
+	const availableServersRamDescOrderedIndices = new Array(availableServers.length);
+	for (let i in availableServers) availableServersRamDescOrderedIndices[i] = i;
+	availableServersRamDescOrderedIndices.sort((a,b)=> serverRams[b] - serverRams[a]);
+	
+
+	for (let index in targetGrowCostDescOrderedIndices) {
+		const curTarget = targets[targetGrowCostDescOrderedIndices[index]];
+		log(`auto-growing:${curTarget}`);
+
+		//TODO ensuring allocation servers count match targets' count (avoid outOfBoundsExceptions);
+		//Now here is assuming target is less than allocation servers
+		const curAvailableServer = availableServers[availableServersRamDescOrderedIndices[index]];
+		const growThd = Math.floor(serverRams[availableServersRamDescOrderedIndices[index]] / scriptCostGB);
+		log(` exec thds ${growThd} on ${curAvailableServer} for target ${curTarget}`);
+		execMulti(ns, curAvailableServer, growThd, autoGrowScript, curTarget, "$threads");
+	}
 
 	for (let target of targets) {
 		log(`auto-growing:${target}`);
@@ -85,39 +117,9 @@ export async function autoGrowSimple(ns, log, targets, availableServers) {
 			log(` exec thds ${growThd} on target ${target}`);
 			execMulti(ns, availableServers[execServerInd], growThd, autoGrowScript, target, "$threads");
 		}
-
-		// wait until target is maximized
-		while (true) {
-			await ns.sleep(1);
-
-			let isAllStopped = true;
-			for (let i in availableServers) {
-				if (ns.scriptRunning(autoGrowScript, availableServers[i])) {
-					isAllStopped = false;
-					break;
-				}
-			}
-
-			if (isAllStopped) {
-				log("all grow finished");
-				break; 
-			}
-		}
 	}
 
-	for (let i in availableServers) {
-		log(`exec on server ${availableServers[i]}`);
-		const totalAvaiGB = ns.getServerMaxRam(availableServers[i]) - ns.getServerUsedRam(availableServers[i]);
-		const avgThd = Math.floor(totalAvaiGB / targets.length / scriptCostGB);
-		if (avgThd < 1) {
-			continue;
-		}
-		for (let j in targets) {
-			log(` exec thds ${avgThd} on target ${targets[j]}`);
-			execMulti(ns, availableServers[i], avgThd, autoGrowScript, targets[j], "$threads");
-		}
-	}
-
+	// wait until target is maximized
 	while (true) {
 		await ns.sleep(1);
 

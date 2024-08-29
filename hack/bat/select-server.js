@@ -140,7 +140,7 @@ export async function chooseTargets(ns, log, dests, availableAllocs, stepMillis,
 			}
 		}
 
-		if (maxIncDpsPT === 0) {
+		if (maxIncDpsPT <= 0) {
 			break;
 		} 
 		
